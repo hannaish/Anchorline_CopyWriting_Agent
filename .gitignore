@@ -1,0 +1,16 @@
+node_modules
+dist
+.env
+.env.local
+uploads/*
+!uploads/.gitkeep
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.DS_Store
+client/node_modules
+client/dist
+server/test-*.cjs
+server/test-*.ts
+server/list-models.cjs
