@@ -1,0 +1,33 @@
+{
+  "name": "focusguard-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FocusGuard — AI-aware distraction blocker with focus-session timers (Chrome MV3 extension)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b --noEmit && vite build",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.7.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/chrome": "^0.1.30",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.7",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
+    "@vitejs/plugin-react": "^6.1.1",
+    "eslint": "^9.39.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.0",
+    "vitest": "^3.2.4"
+  }
+}
