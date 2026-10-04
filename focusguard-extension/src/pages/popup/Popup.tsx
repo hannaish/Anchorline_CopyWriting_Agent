@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { evaluateDecision } from '../../shared/decisionEngine'
-import { getManualRules, getSettings, setManualRules, setSettings } from '../../shared/storage'
-import type { BlockDecision, Settings } from '../../shared/types'
+import { getAISettings, getAiStatus, getManualRules, getSettings, setManualRules, setSettings } from '../../shared/storage'
+import type { AISettings, AIStatus, BlockDecision, Settings } from '../../shared/types'
 
 interface TabInfo {
   url: string
@@ -29,13 +29,22 @@ export default function Popup() {
   const [tab, setTab] = useState<TabInfo | null>(null)
   const [decision, setDecision] = useState<BlockDecision | null>(null)
   const [settings, setSettingsState] = useState<Settings | null>(null)
+  const [aiSettings, setAiSettingsState] = useState<AISettings | null>(null)
+  const [aiStatus, setAiStatusState] = useState<AIStatus | null>(null)
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
     setLoading(true)
-    const [activeTab, currentSettings] = await Promise.all([getActiveTab(), getSettings()])
+    const [activeTab, currentSettings, currentAiSettings, currentAiStatus] = await Promise.all([
+      getActiveTab(),
+      getSettings(),
+      getAISettings(),
+      getAiStatus(),
+    ])
     setTab(activeTab)
     setSettingsState(currentSettings)
+    setAiSettingsState(currentAiSettings)
+    setAiStatusState(currentAiStatus)
     if (activeTab) {
       setDecision(await evaluateDecision({ url: activeTab.url }))
     } else {
@@ -80,12 +89,22 @@ export default function Popup() {
           <span className="h-2 w-2 rounded-full bg-fg-accent" />
           FocusGuard
         </div>
-        <button
-          onClick={() => chrome.runtime.openOptionsPage()}
-          className="text-xs font-medium text-slate-400 hover:text-slate-200"
-        >
-          Options
-        </button>
+        <div className="flex items-center gap-2">
+          {aiStatus?.unavailable && (
+            <span
+              title={aiStatus.reason ?? 'AI unavailable'}
+              className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300"
+            >
+              AI unavailable
+            </span>
+          )}
+          <button
+            onClick={() => chrome.runtime.openOptionsPage()}
+            className="text-xs font-medium text-slate-400 hover:text-slate-200"
+          >
+            Options
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -101,8 +120,12 @@ export default function Popup() {
           </p>
           <p className={`mb-1 text-sm font-bold ${decision?.blocked ? 'text-red-400' : 'text-emerald-400'}`}>
             {decision?.blocked ? 'Blocked' : 'Allowed'}
+            {decision?.category && <span className="ml-2 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">{decision.category}</span>}
           </p>
           <p className="text-xs leading-relaxed text-slate-300">{decision?.reason}</p>
+          {decision?.reason === 'No rule matched' && aiSettings?.enabled && (
+            <p className="mt-1 text-[11px] text-slate-500">FocusGuard will check this more closely with AI once you open the page.</p>
+          )}
 
           <div className="mt-3 flex gap-2">
             <button

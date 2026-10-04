@@ -1,25 +1,52 @@
 import { extractYouTubeChannelToken, matchDefaultList, matchManualRules, normalizeHostname } from './rules/matcher'
-import { getDefaultList, getManualRules, getSettings, pruneExpiredTemporaryAllows, setSettings } from './storage'
-import type { BlockDecision } from './types'
+import { getDefaultList, getManualRules, getNeverClassifyList, getSettings, pruneExpiredTemporaryAllows, setSettings } from './storage'
+import type { BlockDecision, RuleTarget, YouTubeMeta } from './types'
 
 export interface EvaluateInput {
   url: string
-  /** Visible page text (title + meta + excerpt), when available, for keyword rules. */
+  /** Visible page text (title + meta + excerpt), when available, for keyword rules and the AI classifier. */
   text?: string
+  title?: string
+  metaDescription?: string
+  headings?: string
+  youtube?: YouTubeMeta
 }
 
 function allow(reason: string): BlockDecision {
   return { blocked: false, source: null, reason }
 }
 
-/** Runs the manual-rules-first decision pipeline described in the product spec. */
-export async function evaluateDecision(input: EvaluateInput): Promise<BlockDecision> {
-  let hostname: string
+function isLocalHostname(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) return true
+  if (hostname === '127.0.0.1' || hostname === '::1') return true
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) return true
+  return false
+}
+
+/**
+ * The pure, local part of the decision pipeline — manual rules, pause,
+ * temporary allows, the never-classify and default lists, and the music
+ * fast-path. Safe to call from any extension context (no network calls),
+ * so popup/options can preview a verdict without going through the
+ * background worker. Returns null when the page is still undecided and
+ * would need the AI classifier (background-only — see src/background/aiPipeline.ts).
+ */
+export async function evaluatePreAI(input: EvaluateInput): Promise<BlockDecision | null> {
+  let parsed: URL
   try {
-    hostname = normalizeHostname(new URL(input.url).hostname)
+    parsed = new URL(input.url)
   } catch {
-    // Not a navigable http(s) URL (e.g. chrome://, file://) — never block internal pages.
+    // Malformed URL — never block on something we can't even parse.
     return allow('Internal page')
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    // chrome://, file://, about:, extension pages, etc. — never block internal pages.
+    return allow('Internal page')
+  }
+  const hostname = normalizeHostname(parsed.hostname)
+
+  if (isLocalHostname(hostname)) {
+    return allow('Local address — never checked')
   }
 
   const settings = await getSettings()
@@ -57,6 +84,16 @@ export async function evaluateDecision(input: EvaluateInput): Promise<BlockDecis
     }
   }
 
+  const neverClassifyList = await getNeverClassifyList()
+  if (matchDefaultList(neverClassifyList, hostname)) {
+    return allow('Sensitive site — always allowed, never sent to AI')
+  }
+
+  // Music fast-path: skip the AI call entirely for songs, playlists, and official audio.
+  if (hostname === 'music.youtube.com' || input.youtube?.genre === 'Music') {
+    return { blocked: false, source: null, reason: 'Music — always allowed', category: 'music' }
+  }
+
   const defaultList = await getDefaultList()
   const listMatch = matchDefaultList(defaultList, hostname)
   if (listMatch) {
@@ -68,10 +105,16 @@ export async function evaluateDecision(input: EvaluateInput): Promise<BlockDecis
     }
   }
 
-  return allow('No rule matched')
+  return null
 }
 
-function describeTarget(target: 'domain' | 'url' | 'youtubeChannel' | 'keyword'): string {
+/** Pure-pipeline-only decision (no AI call) — used by popup/options for a quick preview. */
+export async function evaluateDecision(input: EvaluateInput): Promise<BlockDecision> {
+  const pre = await evaluatePreAI(input)
+  return pre ?? allow('No rule matched')
+}
+
+export function describeTarget(target: RuleTarget): string {
   switch (target) {
     case 'domain':
       return 'domain'

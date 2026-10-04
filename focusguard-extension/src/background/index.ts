@@ -1,6 +1,13 @@
 import { syncDefaultListDnrRules } from './dnr'
-import { evaluateDecision } from '../shared/decisionEngine'
-import { getManualRules, getTemporaryAllows, initializeStorageDefaults, setManualRules, setTemporaryAllows } from '../shared/storage'
+import { evaluateDecisionWithAI } from './aiPipeline'
+import {
+  appendCorrection,
+  getManualRules,
+  getTemporaryAllows,
+  initializeStorageDefaults,
+  setManualRules,
+  setTemporaryAllows,
+} from '../shared/storage'
 import { STORAGE_KEYS, type ManualRule, type RuntimeMessage } from '../shared/types'
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -21,10 +28,17 @@ chrome.storage.onChanged.addListener((changes, area) => {
 async function handleMessage(message: RuntimeMessage): Promise<unknown> {
   switch (message.type) {
     case 'CHECK_URL':
-      return evaluateDecision({ url: message.url })
+      return evaluateDecisionWithAI({ url: message.url })
 
     case 'CHECK_TEXT':
-      return evaluateDecision({ url: message.url, text: message.text })
+      return evaluateDecisionWithAI({
+        url: message.url,
+        text: message.text,
+        title: message.title,
+        metaDescription: message.metaDescription,
+        headings: message.headings,
+        youtube: message.youtube,
+      })
 
     case 'ADD_QUICK_RULE': {
       const rules = await getManualRules()
@@ -47,6 +61,25 @@ async function handleMessage(message: RuntimeMessage): Promise<unknown> {
         ...allows,
         { domain: message.domain, expiresAt: Date.now() + message.minutes * 60_000, reason: message.reason },
       ])
+      return { ok: true }
+    }
+
+    case 'AI_CORRECTION': {
+      const rules = await getManualRules()
+      const withoutDuplicate = rules.filter((r) => !(r.target === 'url' && r.value === message.url))
+      await setManualRules([
+        ...withoutDuplicate,
+        { id: crypto.randomUUID(), target: 'url', action: 'allow', value: message.url, createdAt: Date.now(), note: 'AI correction' },
+      ])
+      await appendCorrection({
+        id: crypto.randomUUID(),
+        url: message.url,
+        title: message.title,
+        textExcerpt: message.textExcerpt,
+        categoryGiven: message.categoryGiven,
+        correctVerdict: 'allow',
+        createdAt: Date.now(),
+      })
       return { ok: true }
     }
 

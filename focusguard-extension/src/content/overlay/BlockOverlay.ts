@@ -1,5 +1,5 @@
 import { overlayStyles } from './styles'
-import type { RuntimeMessage } from '../../shared/types'
+import type { BlockReasonSource, ContentCategory, RuntimeMessage } from '../../shared/types'
 
 const HOST_ID = 'focusguard-block-root'
 const ALLOW_ONCE_WAIT_SECONDS = 15
@@ -22,10 +22,15 @@ function pauseAndMuteMedia(): void {
 
 export interface BlockOverlayOptions {
   hostname: string
+  url: string
   reason: string
+  source: BlockReasonSource | null
+  category?: ContentCategory
+  title: string
+  textExcerpt: string
 }
 
-export function mountBlockOverlay({ hostname, reason }: BlockOverlayOptions): () => void {
+export function mountBlockOverlay({ hostname, url, reason, source, category, title, textExcerpt }: BlockOverlayOptions): () => void {
   if (document.getElementById(HOST_ID)) {
     // Already showing (e.g. duplicate evaluation) — don't double-mount.
     return () => undefined
@@ -58,6 +63,11 @@ export function mountBlockOverlay({ hostname, reason }: BlockOverlayOptions): ()
           <button class="fg-btn fg-btn-primary" data-action="allow-once-submit" disabled>Please wait…</button>
         </div>
         <button class="fg-btn" data-action="always-allow">Always allow this site</button>
+        ${
+          source === 'aiClassifier'
+            ? '<button class="fg-btn" data-action="ai-wrong">AI got this wrong<span class="fg-btn-sub">Allow this page and teach FocusGuard for next time</span></button>'
+            : ''
+        }
       </div>
     </div>
   `
@@ -90,6 +100,18 @@ export function mountBlockOverlay({ hostname, reason }: BlockOverlayOptions): ()
 
   shadow.querySelector('[data-action="always-allow"]')?.addEventListener('click', () => {
     void sendMessage({ type: 'ADD_QUICK_RULE', target: 'domain', action: 'allow', value: hostname }).then(() => {
+      window.location.reload()
+    })
+  })
+
+  shadow.querySelector('[data-action="ai-wrong"]')?.addEventListener('click', () => {
+    void sendMessage({
+      type: 'AI_CORRECTION',
+      url,
+      title,
+      textExcerpt,
+      categoryGiven: category ?? 'other',
+    }).then(() => {
       window.location.reload()
     })
   })

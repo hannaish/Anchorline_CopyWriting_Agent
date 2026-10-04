@@ -1,11 +1,19 @@
 const MAX_CHARS = 1500
 
+export interface PageSignals {
+  title: string
+  metaDescription: string
+  headings: string
+  /** First ~1500 characters of visible text — used for local keyword matching and, from the AI phase onward, as the classifier's "visible text" input. */
+  text: string
+}
+
 /**
- * Builds the local text excerpt used for keyword rule matching (and, from
- * the AI phase onward, as the "visible text" input to the classifier).
- * Never reaches outside the page in phase 1 — everything here is local.
+ * Builds the local page signals used for keyword rule matching and (once
+ * the AI classifier is enabled) sent to the model. Everything here stays on
+ * the device until the pipeline actually reaches the LLM step.
  */
-export function extractPageText(): string {
+export function extractPageSignals(): PageSignals {
   const title = document.title.trim()
   const metaDescription =
     document.querySelector('meta[name="description"]')?.getAttribute('content')?.trim() ?? ''
@@ -17,5 +25,5 @@ export function extractPageText(): string {
   const bodyText = document.body?.innerText?.trim() ?? ''
 
   const combined = [title, metaDescription, headings, bodyText].filter(Boolean).join('\n')
-  return combined.slice(0, MAX_CHARS)
+  return { title, metaDescription, headings, text: combined.slice(0, MAX_CHARS) }
 }

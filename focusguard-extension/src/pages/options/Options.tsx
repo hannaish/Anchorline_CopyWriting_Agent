@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import AiTab from './AiTab'
+import PrivacyTab from './PrivacyTab'
+import { DomainListEditor } from './DomainListEditor'
 import { getDefaultList, getManualRules, setDefaultList, setManualRules } from '../../shared/storage'
 import { buildExportPayload, parseImportPayload } from '../../shared/importExport'
 import type { DefaultListEntry, ManualRule, RuleAction, RuleTarget } from '../../shared/types'
 
-type Tab = 'rules' | 'defaultList' | 'importExport'
+type Tab = 'rules' | 'defaultList' | 'ai' | 'privacy' | 'importExport'
 
 const TARGET_LABELS: Record<RuleTarget, string> = {
   domain: 'Domain',
@@ -78,6 +81,12 @@ export default function Options() {
           <TabButton active={tab === 'defaultList'} onClick={() => setTab('defaultList')}>
             Default distracting list
           </TabButton>
+          <TabButton active={tab === 'ai'} onClick={() => setTab('ai')}>
+            AI
+          </TabButton>
+          <TabButton active={tab === 'privacy'} onClick={() => setTab('privacy')}>
+            Privacy
+          </TabButton>
           <TabButton active={tab === 'importExport'} onClick={() => setTab('importExport')}>
             Import / Export
           </TabButton>
@@ -86,7 +95,16 @@ export default function Options() {
         {tab === 'rules' && (
           <RulesTab rules={rules} search={search} onSearchChange={setSearch} onChange={persistRules} />
         )}
-        {tab === 'defaultList' && <DefaultListTab list={defaultList} onChange={persistDefaultList} />}
+        {tab === 'defaultList' && (
+          <div>
+            <p className="mb-3 text-sm text-slate-400">
+              Sites here are blocked by default in every focus mode. An "Always allow" rule for a domain overrides it.
+            </p>
+            <DomainListEditor list={defaultList} onChange={persistDefaultList} />
+          </div>
+        )}
+        {tab === 'ai' && <AiTab />}
+        {tab === 'privacy' && <PrivacyTab />}
         {tab === 'importExport' && (
           <ImportExportTab
             rules={rules}
@@ -229,83 +247,6 @@ function RulesTab({
             </tbody>
           </table>
         )}
-      </div>
-    </div>
-  )
-}
-
-function DefaultListTab({ list, onChange }: { list: DefaultListEntry[]; onChange: (list: DefaultListEntry[]) => void }) {
-  const [domain, setDomain] = useState('')
-  const [label, setLabel] = useState('')
-
-  function addEntry() {
-    const d = domain.trim().toLowerCase()
-    if (!d) return
-    if (list.some((e) => e.domain === d)) return
-    onChange([...list, { domain: d, label: label.trim() || d, enabled: true }])
-    setDomain('')
-    setLabel('')
-  }
-
-  function toggleEntry(d: string) {
-    onChange(list.map((e) => (e.domain === d ? { ...e, enabled: !e.enabled } : e)))
-  }
-
-  function removeEntry(d: string) {
-    onChange(list.filter((e) => e.domain !== d))
-  }
-
-  return (
-    <div>
-      <p className="mb-3 text-sm text-slate-400">
-        Sites here are blocked by default in every focus mode. An "Always allow" rule for a domain overrides it.
-      </p>
-
-      <div className="mb-4 rounded-xl border border-slate-800 bg-fg-surface p-4">
-        <p className="mb-3 text-sm font-semibold text-slate-300">Add a site</p>
-        <div className="flex flex-wrap gap-2">
-          <input
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            placeholder="example.com"
-            className="min-w-[200px] flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm placeholder:text-slate-500"
-          />
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Label (optional)"
-            className="min-w-[160px] flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm placeholder:text-slate-500"
-          />
-          <button
-            onClick={addEntry}
-            className="rounded-lg bg-fg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-fg-accent-hover"
-          >
-            Add
-          </button>
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-slate-800">
-        {list.map((e) => (
-          <div
-            key={e.domain}
-            className="flex items-center justify-between border-t border-slate-800 bg-fg-surface px-4 py-2.5 first:border-t-0 odd:bg-fg-surface even:bg-slate-900/40"
-          >
-            <div>
-              <p className="text-sm font-medium">{e.label}</p>
-              <p className="text-xs text-slate-500">{e.domain}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-1.5 text-xs text-slate-400">
-                <input type="checkbox" checked={e.enabled} onChange={() => toggleEntry(e.domain)} />
-                Enabled
-              </label>
-              <button onClick={() => removeEntry(e.domain)} className="text-xs font-semibold text-slate-500 hover:text-red-400">
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   )
