@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-fg-bg: #0b1220;
+  --color-fg-surface: #111a2e;
+  --color-fg-accent: #6366f1;
+  --color-fg-accent-hover: #4f46e5;
+  --color-fg-danger: #ef4444;
+  --color-fg-success: #22c55e;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+body {
+  color-scheme: light dark;
+}
